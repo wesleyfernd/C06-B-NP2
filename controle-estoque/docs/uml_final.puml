@@ -1,0 +1,167 @@
+@startuml UML_Final_Controle_de_Estoque
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+title CONTROLE DE ESTOQUE — UML (VERSÃO FINAL)
+
+package "Produtos e Estoque" {
+  abstract class Produto {
+      - codigo: int
+      - nome: String
+      - quantidade: int
+      - estoqueMinimo: int
+      + Produto(codigo, nome, quantidade, estoqueMinimo)
+      + getCodigo(): int
+      + getNome(): String
+      + getQuantidade(): int
+      + getEstoqueMinimo(): int
+      + aumentarQuantidade(qtd): void
+      + diminuirQuantidade(qtd): void
+      + estaAbaixoDoMinimo(): boolean
+      - {static} validarQuantidadePositiva(qtd): void
+      + {abstract} verificarCondicao(): boolean
+  }
+  class ProdutoPerecivel {
+      - dataValidade: LocalDate
+      + ProdutoPerecivel(codigo, nome, quantidade, estoqueMinimo, dataValidade)
+      + getDataValidade(): LocalDate
+      + verificarCondicao(): boolean
+  }
+  class ProdutoNaoPerecivel {
+      + ProdutoNaoPerecivel(codigo, nome, quantidade, estoqueMinimo)
+      + verificarCondicao(): boolean
+  }
+  class Estoque {
+      - produtos: Map<Integer,Produto>
+      + adicionarProduto(produto): void
+      + buscarProduto(codigo): Produto
+      + listarProdutos(): List<Produto>
+      + aumentarQuantidade(codigo, qtd): void
+      + diminuirQuantidade(codigo, qtd): void
+  }
+}
+
+package "Movimentações" {
+  abstract class Movimentacao {
+      - codigoProduto: int
+      - quantidade: int
+      - dataHora: LocalDateTime
+      # Movimentacao(codigoProduto, quantidade)
+      # Movimentacao(codigoProduto, quantidade, dataHora)
+      + getCodigoProduto(): int
+      + getQuantidade(): int
+      + getDataHora(): LocalDateTime
+      + {abstract} executar(estoque: Estoque): void
+      + {abstract} getTipo(): String
+  }
+  class Entrada {
+      + Entrada(codigoProduto, quantidade)
+      + Entrada(codigoProduto, quantidade, dataHora)
+      + executar(estoque): void
+      + getTipo(): String
+  }
+  class Saida {
+      + Saida(codigoProduto, quantidade)
+      + Saida(codigoProduto, quantidade, dataHora)
+      + executar(estoque): void
+      + getTipo(): String
+  }
+  class MovimentacaoService {
+      - estoque: Estoque
+      - repositorio: RepositorioDados
+      - historico: List<Movimentacao>
+      + MovimentacaoService(estoque, repositorio)
+      + registrarEntrada(codigo, quantidade): void
+      + registrarSaida(codigo, quantidade): void
+      + consultarHistorico(): List<Movimentacao>
+      - processar(movimentacao): void
+  }
+}
+
+package "Persistência e Integração" {
+  interface RepositorioDados {
+      + carregarProdutos(): List<Produto>
+      + salvarProdutos(produtos): void
+      + registrarMovimentacao(m): void
+      + carregarHistorico(): List<Movimentacao>
+  }
+  class RepositorioArquivo {
+      - arquivoProdutos: Path
+      - arquivoHistorico: Path
+      + RepositorioArquivo()
+      + RepositorioArquivo(arquivoProdutos, arquivoHistorico)
+      + carregarProdutos(): List<Produto>
+      + salvarProdutos(produtos): void
+      + registrarMovimentacao(m): void
+      + carregarHistorico(): List<Movimentacao>
+      - converterProduto(linha, numeroLinha): Produto
+      - converterMovimentacao(linha, numeroLinha): Movimentacao
+      - {static} lerLinhas(arquivo): List<String>
+      - {static} escrever(arquivo, texto, modo): void
+  }
+  class Main {
+      + {static} main(args): void
+      - {static} executarMenu(scanner, estoque, servico, monitor): void
+      - {static} exibirMenu(): void
+      - {static} lerInteiro(scanner, pergunta): int
+      - {static} registrarEntrada(scanner, servico, monitor): void
+      - {static} registrarSaida(scanner, servico, monitor): void
+      - {static} consultarHistorico(servico): void
+      - {static} consultarProdutos(estoque): void
+      - {static} verificarAlertas(monitor): void
+      - {static} carregarProdutos(repositorio, estoque): void
+      - {static} salvarProdutos(repositorio, estoque): void
+  }
+}
+
+package "Monitoramento e Comunicação" {
+  interface Notificavel {
+      + notificar(mensagem): void
+  }
+  class NotificadorConsole {
+      - origem: String
+      - destino: String
+      + NotificadorConsole()
+      + NotificadorConsole(origem, destino)
+      + notificar(mensagem): void
+      + getOrigem(): String
+      + getDestino(): String
+  }
+  class MonitorEstoque {
+      - estoque: Estoque
+      - notificador: Notificavel
+      + MonitorEstoque(estoque, notificador)
+      + verificarEstoque(): void
+      - enviar(mensagem): void
+  }
+}
+
+package "Exceções" {
+  class EstoqueException <<RuntimeException>> {
+      + EstoqueException(mensagem)
+  }
+  class ProdutoNaoEncontradoException
+  class EstoqueInsuficienteException
+  class ProdutoDuplicadoException
+}
+
+ProdutoPerecivel --|> Produto
+ProdutoNaoPerecivel --|> Produto
+Entrada --|> Movimentacao
+Saida --|> Movimentacao
+RepositorioArquivo ..|> RepositorioDados
+NotificadorConsole ..|> Notificavel
+ProdutoNaoEncontradoException --|> EstoqueException
+EstoqueInsuficienteException --|> EstoqueException
+ProdutoDuplicadoException --|> EstoqueException
+Estoque o-- "0..*" Produto
+MovimentacaoService o--> Movimentacao : histórico 0..*
+MovimentacaoService --> Estoque : usa
+MovimentacaoService --> RepositorioDados : usa
+Movimentacao ..> Estoque : executar(estoque)
+MonitorEstoque --> Estoque : consulta
+MonitorEstoque --> Notificavel : notifica
+Main ..> RepositorioArquivo
+Main ..> MovimentacaoService
+Main ..> MonitorEstoque
+Main ..> NotificadorConsole
+@enduml
